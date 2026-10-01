@@ -1,0 +1,75 @@
+import os
+from crewai import Agent, Task, Crew, Process, LLM
+
+# -------------------------------------------------------------
+# CONFIGURAÇÃO DO MODELO CLAUDE
+# -------------------------------------------------------------
+# Definimos o modelo que será usado por padrão pelos agentes
+claude_llm = LLM(
+    model="anthropic/claude-3-5-sonnet", # Nome do modelo no formato do CrewAI
+    temperature=0.7,                     # Criatividade (ajuste se quiser respostas mais rígidas ou criativas)
+    api_key=os.environ.get("ANTHROPIC_API_KEY")
+)
+
+# -------------------------------------------------------------
+# DEFINIÇÃO DOS AGENTES (Vinculados ao Claude)
+# -------------------------------------------------------------
+
+diretor_produto = Agent(
+    role="Diretor de Produto (Product Director)",
+    goal="Transformar ideias de negócio de alto nível em Épicos de produto estruturados e estratégicos.",
+    backstory="Você é um líder de produto focado em estratégia e valor de negócio.",
+    llm=claude_llm, # <--- Vincula este agente ao Claude
+    verbose=True
+)
+
+gerente_produto = Agent(
+    role="Gerente de Produto (Product Manager)",
+    goal="Quebrar Épicos estratégicos em Features funcionais e claras.",
+    backstory="Você é excelente em design de sistemas e experiência do usuário.",
+    llm=claude_llm, # <--- Vincula este agente ao Claude
+    verbose=True
+)
+
+analista_negocio = Agent(
+    role="Analista de Negócios / Product Owner",
+    goal="Escrever histórias de usuário detalhadas com critérios de aceite rigorosos.",
+    backstory="Você é extremamente detalhista e domina a escrita de BDD.",
+    llm=claude_llm, # <--- Vincula este agente ao Claude
+    verbose=True
+)
+
+# -------------------------------------------------------------
+# AS TAREFAS E A ORQUESTRAÇÃO CONTINUAM EXATAMENTE IGUAIS
+# -------------------------------------------------------------
+
+tarefa_epico = Task(
+    description="Com base na ideia bruta: '{ideia_produto}', crie um Épico de produto.",
+    expected_output="Documento de Épico estruturado em Markdown.",
+    agent=diretor_produto
+)
+
+tarefa_features = Task(
+    description="Analise o Épico gerado anteriormente e liste as Features principais necessárias.",
+    expected_output="Lista de Features detalhadas associadas ao Épico.",
+    agent=gerente_produto
+)
+
+tarefa_historias = Task(
+    description="Pegue as Features listadas e escreva as Histórias de Usuário.",
+    expected_output="Backlog completo com Histórias de Usuário e Critérios de Aceite.",
+    agent=analista_negocio
+)
+
+crew_de_produto = Crew(
+    agents=[diretor_produto, gerente_produto, analista_negocio],
+    tasks=[tarefa_epico, tarefa_features, tarefa_historias],
+    process=Process.sequential,
+    verbose=True
+)
+
+# Execução
+ideia = "Um sistema de checkout em um clique para e-commerce usando IA."
+resultado_backlog = crew_de_produto.kickoff(inputs={"ideia_produto": idea})
+
+print(resultado_backlog)
